@@ -1,0 +1,1539 @@
+
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Plot me anything!</title>
+  <script src="https://d3js.org/d3.v6.min.js"></script>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pca-js@latest"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/venn.js/0.2.14/venn.min.js"></script>
+
+
+  <style>
+    #buttonContainerVenn {
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Navigation Bar Styles */
+    #navbar {
+      overflow: hidden;
+      background-color: #333;
+    }
+
+    #navbar a {
+      float: left;
+      display: block;
+      color: #f2f2f2;
+      text-align: center;
+      padding: 14px 16px;
+      text-decoration: none;
+    }
+
+    #navbar a:hover {
+      background-color: #ddd;
+      color: black;
+    }
+
+    /* Sections Styles */
+    .section {
+      display: none;
+      /* Initially hide both sections */
+    }
+
+    .section.active {
+      display: block;
+      /* Show section with 'active' class */
+    }
+
+    body {
+      background-color: #f4f4f4;
+      font-family: Arial, sans-serif;
+      margin: 50;
+      padding: 10;
+    }
+
+    #upload {
+      display: none;
+    }
+
+    #btnExport {
+      background-color: #D5EDF6;
+      border: 1px solid #266DB6;
+      box-sizing: border-box;
+      color: #00132C;
+      padding: 16px 23px;
+      text-align: center;
+      text-decoration: none;
+      font-size: 16px;
+      margin: 4px 2px;
+      cursor: pointer;
+    }
+
+    .button {
+      background-color: #4c77af;
+      color: white;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.3s, box-shadow 0.3s, transform 0.1s;
+    }
+
+    .disabled-label {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    input[type="file"] {
+      display: none;
+      /* Hide the default input */
+    }
+
+    .button:hover {
+      background-color: #6c96ce;
+      box-shadow: 0px 2px 10px rgba(0, 0, 0, 0.2);
+    }
+
+    .button:active {
+      transform: scale(0.98);
+      /* Scales down the button a bit when active (pushed) */
+      box-shadow: inset 0 3px 5px rgba(0, 0, 0, 0.2);
+    }
+
+    .loadStatus {
+      display: none;
+      color: green;
+      margin-left: 10px;
+    }
+
+    @media (min-width: 768px) {
+      .button {
+        padding: 16px 32px;
+      }
+    }
+
+    #plot {
+      position: relative;
+    }
+
+    .dot-name {
+      position: absolute;
+      pointer-events: none;
+      color: black;
+      padding: 5px;
+      font-family: Arial, sans-serif;
+      font-weight: bold;
+      font-size: 12px;
+      transform: translate(-50%, -100%);
+    }
+
+    .dot-description {
+      margin-top: 5px;
+      font-weight: bold;
+    }
+
+    #container {
+      margin-top: 50px;
+      margin-left: 50px;
+      display: flex;
+      height: 100vh;
+    }
+
+    #plot {
+      flex: 1;
+    }
+
+    #dot-names {
+      flex: 1;
+      margin-left: 20px;
+    }
+
+
+    #plotTitleInput,
+    #btnUpdateTitle {
+      display: none;
+    }
+
+    #parent-container {
+      margin-top: 50px;
+      margin-left: 50px;
+      display: flex;
+    }
+
+
+    #controls-container {
+      height: 40px;
+      margin-left: 10px;
+      margin-top: 10px;
+      display: flex;
+    }
+
+    .intersection-table {
+      width: 100%;
+      /* Full width of the parent container */
+      border-collapse: collapse;
+      /* Merges adjacent table cell borders */
+      font-family: Arial, sans-serif;
+      background-color: #b3b3b3;
+      /* Dark background color for the table */
+      color: #232323;
+      /* White text color */
+      margin-top: 20px;
+      /* Space above the table */
+    }
+
+    /* Table headers styling */
+    .intersection-table th {
+      background-color: #709ace;
+      /* Darker blue background color for headers */
+      padding: 10px 15px;
+      /* Padding for the header cells */
+      text-transform: uppercase;
+      /* Transforms text to uppercase */
+    }
+
+    /* Table rows styling */
+    .intersection-table tr {
+      border-bottom: 1px solid #2b2b44;
+      /* Border at the bottom of each row */
+    }
+
+    /* Table data cell styling */
+    .intersection-table td {
+      padding: 10px 15px;
+      /* Padding for the data cells */
+    }
+
+    /* Hover effect for rows */
+    .intersection-table tr:hover {
+      background-color: #2b2b44;
+      /* Slightly different shade when hovering over a row */
+    }
+
+    /* This is for the title or caption */
+    .intersection-table caption {
+      text-align: center;
+      font-weight: bold;
+      margin-bottom: 20px;
+      font-size: 20px;
+      /* Font size for the title */
+      color: rgb(0, 0, 0);
+    }
+  </style>
+</head>
+
+<body>
+
+  <div id="navbar">
+    <a href="#" id="btnVolcano">Volcano Plot</a>
+    <a href="#" id="btnPCA">PCA</a>
+    <a href="#" id="btnVenn">Venn Diagram Genes</a>
+    <a href="#" id="btnVennKegg">Venn Diagram Kegg</a>
+  </div>
+  <br><br>
+
+  <div id="volcanoSection" class="section active">
+    <h3>Upload a file with the MS results, the file have "MS" in the name.</h3>
+    <p>Mandatory columns are "Genes", "adj.P.val" and "Xn_vs_Xm"</p>
+    <label for="upload" class="button">Load CSV</label>
+    <input type="file" id="upload" accept=".csv" />
+    <div>
+      <br> <br>
+      <button id="btnSearchGene" class="button">Mark Genes</button>
+      <input type="text" id="geneSearchInput" placeholder="Enter Gene Name">
+    </div>
+
+    <div id="parent-container">
+      <div id="buttonexp-container">
+        <button id="btnExport" class="button" style="display: none;">Export to SVG</button>
+      </div>
+      <div id="controls-container">
+        <input type="text" id="plotTitleInput" style="display: none;" name="plotTitleInput">
+        <button id="btnUpdateTitle" style="display: none;">Update Title</button>
+      </div>
+    </div>
+
+
+    <div id="container">
+      <div id="plot"></div>
+      <div id="dot-names"></div>
+    </div>
+  </div>
+
+
+  <div id="PCASection" class="section">
+    <h3> Please Load MS intensities csv, for example "Loess_X230321_5H_3H_ttest_peptides_intensities_genes.csv"</h3>
+    <label for="uploadPCA" class="button">Load CSV</label>
+    <input type="file" id="uploadPCA" accept=".csv" />
+
+    <div id="parent-container">
+      <div id="buttonexp-container">
+        <button id="btnPCAExport" class="button" style="display: none;">Export to SVG</button>
+      </div>
+      <div id="controls-container">
+        <input type="text" id="plotPCATitleInput" name="plotPCATitleInput" style="display: none;">
+        <button id="btnPCAUpdateTitle" style="display: none;">Update Title</button>
+      </div>
+    </div>
+
+    <div id="container">
+      <div id="plotPCA" style="height: 600px;"></div>
+    </div>
+  </div>
+
+
+  <div id="vennSection" class="section">
+    <h3> Upload files with the MS results, the files have "MS" in the name. </h3> <br>
+    <p>Mandatory columns are "Genes" and "Xn_vs_Xm"</p><br>
+    <label for="uploadFiles" class="button">Load CSV 1</label>
+    <input type="file" id="uploadFiles" accept=".csv" /><br><br>
+    <button id="clearData">Clear Data</button>
+    <div id="loadedFilesList"></div>
+
+    <div id="parent-container">
+      <div id="buttonContainerVenn">
+        <button id="btnGenerateVenn" class="button" style="display: none;">Venn Diagram</button>
+        <br>
+        <button class="button" id="downloadSVG" style="display: none;">Download Venn Diagram</button>
+      </div>
+      <br><br>
+      <svg width="600" height="400" id="vennUp"></svg>
+      <svg width="600" height="400" id="vennDown"></svg>
+    </div>
+    <div id="parent-container">
+      <div id="vennUpregulatedDataContainer">
+        <h3>Upregulated Data </h3>
+      </div>
+      <div id="vennDownregulatedDataContainer">
+        <h3>Downregulated Data </h3>
+      </div>
+      <br><br><br><br><br>
+    </div>
+  </div>
+
+
+  <div id="vennKeggSection" class="section">
+    <h3> Upload files with KEGG results, the files have "KEGG" in the name. </h3> <br>
+    <p>Mandatory columns are "pathway" and "ES"</p><br>
+    <label for="uploadKeggFiles" class="button">Load CSV 1</label>
+    <input type="file" id="uploadKeggFiles" accept=".csv" /><br><br>
+    <button id="clearKeggData">Clear KEGG Data</button>
+    <div id="loadedFilesKeggList"></div>
+
+    <div id="parent-container">
+      <div id="buttonContainerVenn">
+        <button id="btnGenerateKeggVenn" class="button" style="display: none;">Venn Diagram</button>
+        <br>
+        <button class="button" id="downloadKeggSVG" style="display: none;">Download Venn Diagram</button>
+      </div>
+      <br><br>
+      <svg width="600" height="400" id="vennKeggUp"></svg>
+      <br>
+      <svg width="600" height="400" id="vennKeggDown"></svg>
+    </div>
+    <div id="parent-container"></div>
+    <div id="keggUpregulatedDataContainer">
+      <h3>Upregulated Data </h3>
+    </div>
+    <div id="keggDownregulatedDataContainer">
+      <h3>Downregulated Data </h3>
+    </div>
+    <br><br><br><br><br>
+  </div>
+  </div>
+
+
+
+  <script>
+
+    // global constants and vars
+    const vlcnWidth = 1200; // default sizing of Volcano Plot
+    const vlcnHeight = 900;
+
+    var vlcnMaxY;
+    var vlcnMaxX;
+    var vlcnMinX;
+    var vlcnMinY;
+
+    // showing label / code for click or hard select in mark genes filter
+    function VlcnShowLabel(x, y, label, dotName, foundIndex) {
+
+      if (document.getElementById(`dot-name-${foundIndex}`)) {
+        // If the label already exists, remove it
+        document.getElementById(`dot-name-${foundIndex}`).remove();
+        document.getElementById(`dot-description-${foundIndex}`).remove();
+
+      } else {
+        // If the label does not exist, create it
+
+        const plotDiv = document.getElementById('plot');
+        const dotNameElement = document.createElement('div');
+        const dotNamesDiv = document.getElementById('dot-names');
+
+        dotNameElement.classList.add('dot-name');
+        dotNameElement.id = `dot-name-${foundIndex}`;  // Assign a unique ID
+        dotNameElement.textContent = dotName;
+        dotNameElement.style.left = `calc(${x}px + 2%)`; //xcoord; //`calc(${plotData[0].x[foundIndex]}px + 2%)`; // bad coords
+        dotNameElement.style.top = `calc(${y}px - 0.5%)`; //`calc(${plotData[0].y[foundIndex]}px - 0.5%)`;
+        plotDiv.appendChild(dotNameElement);
+
+        // If the description does not exist, create it
+        const dotDescriptionElement = document.createElement('div');
+        dotDescriptionElement.classList.add('dot-description');
+        dotDescriptionElement.id = `dot-description-${foundIndex}`;  // Assign a unique ID
+        dotDescriptionElement.textContent = `${dotName}: ${label}`;
+        dotNamesDiv.appendChild(dotDescriptionElement);
+      }
+    }
+
+    // JavaScript to toggle sections visibility
+    document.getElementById('btnVolcano').addEventListener('click', function () {
+      document.getElementById('volcanoSection').classList.add('active');
+      document.getElementById('vennSection').classList.remove('active');
+      document.getElementById('vennKeggSection').classList.remove('active');
+      document.getElementById('PCASection').classList.remove('active');
+    });
+
+    document.getElementById('btnVenn').addEventListener('click', function () {
+      document.getElementById('vennSection').classList.add('active');
+      document.getElementById('volcanoSection').classList.remove('active');
+      document.getElementById('vennKeggSection').classList.remove('active');
+      document.getElementById('PCASection').classList.remove('active');
+    });
+
+    document.getElementById('btnVennKegg').addEventListener('click', function () {
+      document.getElementById('vennKeggSection').classList.add('active');
+      document.getElementById('volcanoSection').classList.remove('active');
+      document.getElementById('vennSection').classList.remove('active');
+      document.getElementById('PCASection').classList.remove('active');
+    });
+
+    document.getElementById('btnPCA').addEventListener('click', function () {
+      document.getElementById('PCASection').classList.add('active');
+      document.getElementById('volcanoSection').classList.remove('active');
+      document.getElementById('vennSection').classList.remove('active');
+      document.getElementById('vennKeggSection').classList.remove('active');
+    });
+
+    document.getElementById('btnExport').addEventListener('click', function () {
+      Plotly.downloadImage('plot', {
+        format: 'svg', // can also choose 'jpeg', 'webp', etc
+        filename: 'your-plot-filename'
+      });
+    });
+
+    document.getElementById('upload').addEventListener('click', function () {
+      this.value = '';
+    });
+
+    document.getElementById('btnUpdateTitle').addEventListener('click', function () {
+      // Get the new title from the input field
+      var newTitle = document.getElementById('plotTitleInput').value;
+
+      // Update the plot layout with the new title
+      var update = {
+        'title.text': newTitle
+      };
+
+      // Apply the update to the plot
+      Plotly.update('plot', {}, update);
+    });
+
+    document.getElementById('upload').addEventListener('change', function () {
+      var file = this.files[0];
+      // Extract the name between 'MS_' and '.csv' from the file name
+      var filename = file.name;
+      var startIdx = filename.indexOf("MS_") + 3;  // Index of "MS_" plus its length
+      var endIdx = filename.lastIndexOf(".csv");
+      var plotTitle = filename.slice(startIdx, endIdx);
+      var plotData, layout, config;
+
+      ////////////////////////////////////////////
+      ///// VOLCANOS
+      ///////////////////////////////////////////
+
+      d3.csv(URL.createObjectURL(file)).then(function (data) {
+        document.getElementById('plot').innerHTML = '';
+        document.getElementById('dot-names').innerHTML = '';
+
+        var xValues = data.map(function (row) {
+          return +row['logFC']*(-1);
+        });
+
+        var yValues = data.map(function (row) {
+          return +row['negLog10_sca_adjPval'];
+        });
+
+        var dotNames = data.map(function (row) {
+          return row['Genes'];
+          console.log(dotNames)
+        });
+
+        const maxYValue = Math.max(...yValues) * 1.1;
+
+        vlcnMaxX = Math.max(...xValues);
+        vlcnMaxY = Math.max(...yValues);
+
+        vlcnMinX = Math.min(...xValues);
+        vlcnMinY = Math.min(...yValues);
+
+        const marker = {
+          color: [],
+          size: 8,
+          opacity: []
+        };
+
+        var numRight = 0;
+        var numLeft = 0;
+
+        var colorLeft = '#40BFC1';
+        var colorRight = '#F76075';
+
+        for (let i = 0; i < data.length; i++) {
+          const xValue = +data[i]['logFC']*-1;
+          const yValue = +data[i]['negLog10_sca_adjPval'];
+
+          // colors
+          if (xValue >= 0.5 && yValue >= 1.2) {
+            marker.color.push(colorRight);
+            marker.opacity.push(1); // Fully Opaque
+            numRight++;
+          } else if (xValue <= -0.5 && yValue >= 1.2) {
+            marker.color.push(colorLeft);
+            marker.opacity.push(1); // Fully Opaque
+            numLeft++;
+          } else {
+            marker.color.push('#BDBFBE');
+            marker.opacity.push(0.5); // Fully Opaque
+          }
+
+        }
+
+        const plotData = [
+          {
+            x: xValues,
+            y: yValues,
+            mode: 'markers',
+            type: 'scatter',
+            text: dotNames,
+            marker: marker
+          }
+        ];
+
+        const layout = {
+          title: {
+            text: plotTitle.replace(/_/g, ' '),
+            font: {
+              size: 28,
+              bold: true
+            },
+          },
+
+          width: vlcnWidth,
+          height: vlcnHeight,
+
+          xaxis: {
+            title: {
+              text: 'Log2 Fold Change',
+              font: {
+                size: 20,
+                color: 'black',
+                family: 'Arial',
+              }
+            },
+
+            tickfont: {
+              size: 18, // Font size for the X axis tick labels
+              color: 'black', // Optional: Font color for the X axis tick labels
+              family: 'Arial',
+            },
+
+            showticklabels: true, // Show tick labels on the X axis
+            ticks: 'outside',     // Draw tick marks on the outside
+            tick0: 0,             // Starting position for the ticks
+            dtick: 1.0,           // Interval between tick marks
+            ticklen: 5,           // Length of the tick marks
+            tickwidth: 1.5,         // Width of the tick marks
+            tickcolor: 'black',   // Color of the tick marks
+
+            showgrid: false,  // Remove x-axis gridlines
+            zeroline: false,   // hides x-axis zero line
+            zerolinewidth: 2,
+            zerolinecolor: 'black',
+          },
+
+          yaxis: {
+            range: [-0.2, maxYValue],
+            title: {
+              text: '-log10 (adjPval)',
+              font: {
+                size: 30,
+                color: 'black',
+                family: 'Arial' // Specify the font family here
+              }
+            },
+            tickfont: {
+              size: 18, // Font size for the X axis tick labels
+              color: 'black',
+              family: 'Arial'
+            },
+
+            showticklabels: true, // Show tick labels on the X axis
+            ticks: 'outside',     // Draw tick marks on the outside
+            tick0: 0,             // Starting position for the ticks
+            dtick: 1.0,           // Interval between tick marks
+            ticklen: 5,           // Length of the tick marks
+            tickwidth: 1.5,         // Width of the tick marks
+            tickcolor: 'black',   // Color of the tick marks
+
+            showgrid: false,  // Remove y-axis gridlines
+            zeroline: false,   // hides y-axis zero line
+            zerolinewidth: 1.5,
+            zerolinecolor: 'black',
+          },
+
+          hovermode: 'closest',
+          dragmode: false,
+          zoom: false,
+          shapes: [
+            // Existing horizontal line
+            {
+              type: 'line',
+              xref: 'paper',
+              x0: 0,
+              x1: 1,
+              yref: 'y',
+              y0: 1.2,
+              y1: 1.2,
+              line: {
+                color: 'rgba(0, 0, 0, 0.5)',
+                dash: 'dash',
+                width: 1.5
+              }
+            },
+            // Vertical line at x = -1.2
+            {
+              type: 'line',
+              xref: 'x',
+              x0: -0.5,
+              x1: -0.5,
+              yref: 'paper',
+              y0: 0,
+              y1: 1,
+              line: {
+                color: 'rgba(0, 0, 0, 0.5)',
+                dash: 'dash'
+              }
+            },
+            // Vertical line at x = 1.2
+            {
+              type: 'line',
+              xref: 'x',
+              x0: 0.5,
+              x1: 0.5,
+              yref: 'paper',
+              y0: 0,
+              y1: 1,
+              line: {
+                color: 'rgba(0, 0, 0, 0.5)',
+                dash: 'dash',
+                width: 1.5
+              }
+            },
+            /*   // New X-axis line at y=0
+              {
+                  type: 'line',
+                  xref: 'paper',
+                  x0: 0,
+                  x1: 1,
+                  yref: 'y',
+                  y0: 0,
+                  y1: 0,
+                  line: {
+                    color: 'rgba(0, 0, 0, 0.5)',
+                    dash: 'dash',
+                    width: 1.5
+                  }
+                }, */
+            // New Y-axis line at x=0
+            {
+              type: 'line',
+              xref: 'x',
+              x0: 0,
+              x1: 0,
+              yref: 'paper',
+              y0: 0,
+              y1: 1,
+              line: {
+                color: 'black',
+                width: 1.5
+              }
+            },
+            {
+              type: 'rect',
+              xref: 'paper',
+              x0: 0,
+              x1: 1,
+              yref: 'paper',
+              y0: 0,
+              y1: 1,
+              line: {
+                color: 'black',
+                width: 2
+              },
+              fillcolor: 'rgba(0,0,0,0)'
+            }
+          ]
+
+
+        };
+        const config = {
+          displayModeBar: false  // Disable the display of the mode bar (toolbar)
+        };
+
+        Plotly.newPlot('plot', plotData, layout, config).then(function () {
+          const plotDiv = document.getElementById('plot');
+          const dotNamesDiv = document.getElementById('dot-names');
+
+          plotDiv.on('plotly_click', function (eventData) {
+            const pointIndex = eventData.points[0].pointNumber;
+            const dotName = eventData.points[0].data.text[pointIndex];
+            const xValue = eventData.points[0].x;
+            const yValue = eventData.points[0].y;
+
+            VlcnShowLabel(eventData.event.offsetX, eventData.event.offsetY, data[pointIndex]['ProtDesc'], dotName, pointIndex)
+
+          });
+        });
+
+
+        let highlightedXValues = [];
+        let highlightedYValues = [];
+        let highlightedText = [];
+
+        document.getElementById('btnSearchGene').addEventListener('click', function () {
+          const inputGene = document.getElementById('geneSearchInput').value.trim().toUpperCase();
+          if (!inputGene) {
+            alert("Please enter a gene name.");
+            return;
+          }
+          let found = false;
+          let foundIndex = -1;
+          // Reset highlighted data for each search
+          highlightedXValues = []; 
+          highlightedYValues = [];
+          highlightedText = [];
+
+          // Adjust marker colors and collect highlighted gene data
+          plotData[0].marker.color = data.map((row, index) => {
+            const geneName = row['Genes'].toUpperCase();
+            if (geneName === inputGene) {
+              found = true;
+              foundIndex = index;
+              // Append data for the highlighted gene to separate arrays
+              highlightedXValues.push(+row['logFC']*(-1));
+              highlightedYValues.push(+row['negLog10_sca_adjPval']);
+              highlightedText.push(row['Genes']);
+              return 'black'; // This color is now essentially placeholder
+            } else {
+              // Apply original colors
+              return marker.color[index];
+            }
+          });
+
+          if (!found) {
+            alert("No matching gene found.");
+            return;
+          } else {
+            // Add a new trace for the highlighted gene
+            plotData.push({
+              x: highlightedXValues,
+              y: highlightedYValues,
+              mode: 'markers',
+              type: 'scatter',
+              text: inputGene,
+              marker: {
+                color: 'black', // Highlight color
+                size: 10, // Make the highlighted gene's marker slightly larger
+                opacity: 1
+              }
+            });
+
+            let dotName = plotData[0].text[foundIndex];
+
+            var ycorrection = -0.2;
+            var xratio = 0.772; // how far labels are on x compared to width of plot
+            var xadd = 125; // offset from the left border of the window
+            // todo: make analytical as a function of width / height; for width 1200 ratio is 0.772, add 125; for width 900 ratio is 0.734, add 115
+            //var xratio = vlcnWidth/(xlogical+0.1*(xlogical-vlcnWidth-354.4));
+            //var xlogical = 1554.4;
+
+            var yratio = 0.727;
+            var yadd = 80;
+
+            var xcoord = ((plotData[0].x[foundIndex] - vlcnMinX) / (vlcnMaxX - vlcnMinX)) * vlcnWidth * xratio + xadd; // coords on plot canvas: ratio on plot * width + small offset
+            var ycoord = vlcnHeight - ((plotData[0].y[foundIndex] - ycorrection) / (vlcnMaxY - ycorrection)) * vlcnHeight * yratio - yadd; // y is offset by definition
+
+            VlcnShowLabel(xcoord, ycoord, data[foundIndex]['ProtDesc'], dotName, foundIndex);
+
+            layout.showlegend = false;
+            Plotly.react('plot', plotData, layout, config);
+
+            // Update or create a label for the gene name
+            /*
+             const plotDiv = document.getElementById('plot');
+            const geneNameLabelId = 'gene-name-label';
+            let geneNameLabel = document.getElementById(geneNameLabelId);
+
+            if (!geneNameLabel) {
+              // If the label doesn't exist, create it
+              geneNameLabel = document.createElement('div');
+              geneNameLabel.id = geneNameLabelId;
+              geneNameLabel.classList.add('gene-name-label');
+              plotDiv.appendChild(geneNameLabel);
+            }
+            */
+            //geneNameLabel.textContent = inputGene; 
+            //geneNameLabel.style.position = "absolute";
+            //geneNameLabel.style.bottom = "20px";
+            //geneNameLabel.style.right = "20px";
+          }
+        });
+
+        document.getElementById('btnExport').style.display = 'block';
+        document.getElementById('plotTitleInput').style.display = 'block';
+        document.getElementById('btnUpdateTitle').style.display = 'block';
+
+        // write sums of blue and red
+        const plotDiv = document.getElementById('plot');
+        const counterElementLeft = document.createElement('div');
+        const counterElementRight = document.createElement('div');
+
+        counterElementLeft.classList.add('dot-sum-left');
+        counterElementLeft.id = 'dot-sum-leftnumber';  // Assign a unique ID
+        counterElementLeft.textContent = "n = " + numLeft;
+        counterElementLeft.style.color = colorLeft;
+        counterElementLeft.style.fontWeight = "bold";
+        counterElementLeft.style.left = "100px";
+        counterElementLeft.style.top = "120px";
+        counterElementLeft.style.position = "absolute";
+        
+
+        counterElementRight.classList.add('dot-sum-right');
+        counterElementRight.id = 'dot-sum-rightnumber';  // Assign a unique ID
+        counterElementRight.textContent = "n = " + numRight;
+        counterElementRight.style.color = colorRight;
+        counterElementRight.style.fontWeight = "bold";
+        counterElementRight.style.left = `calc(${vlcnWidth-150}px)`; 
+        counterElementRight.style.top = "120px";
+        counterElementRight.style.position = "absolute";
+        counterElementRight.style.textAlign = "right";
+
+        plotDiv.appendChild(counterElementLeft);
+        plotDiv.appendChild(counterElementRight);
+
+
+      }).catch(function (error) {
+        console.log(error);
+      });
+    });
+
+
+
+
+    //////////////////////////////////////////////
+    ///// PCA
+    /////////////////////////////////////////////
+
+    document.getElementById('uploadPCA').addEventListener('change', readPCAcsv, false);
+
+    function readPCAcsv(event) {
+      const file = event.target.files[0];
+      if (!file) {
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const csv = e.target.result;
+        const parsedCSV = d3.csvParse(csv);
+        // A simple function to transpose a matrix
+        function transpose(matrix) {
+          return matrix[0].map((col, i) => matrix.map(row => row[i]));
+        }
+
+
+        // Assuming data columns that are not 'ID','Genes','Peptide.Count','ProteinDesc' are numerical.
+        const excludeCols = ['ID', 'Genes', 'Peptide.Count', 'ProteinDesc'];
+        const data = parsedCSV.map(d => Object.keys(d).filter(key => !excludeCols.includes(key)).map(key => +d[key]));
+        const groupNames = Object.keys(parsedCSV[0]).filter(key => !excludeCols.includes(key));
+        console.log(data.length, data[0].length)
+
+
+        // Load the data
+        /*         const data = [
+                  [1, 2, 3],
+                  [4, 5, 6],
+                  [7, 8, 9],
+                ]; */
+
+        // Transposing the data matrix
+        const transposedData = transpose(data);
+        console.log(transposedData.length, transposedData[0].length)
+        // Get the principal components
+        const principalComponents = PCA.getEigenVectors(transposedData);
+
+        const pc1 = principalComponents[0].vector;
+        const pc2 = principalComponents[1].vector;
+        console.log(pc1.length, pc1)
+        // Extract prefixes and assign colors.
+        const uniquePrefixes = [...new Set(groupNames.map(name => name.split("_")[0]))];
+        console.log(uniquePrefixes)
+        const colorScale = d3.scaleOrdinal(d3.schemeCategory10).domain(uniquePrefixes); // Using a predefined color schema
+
+        // Construct traces for Plotly with proper coloring.
+        const traces = groupNames.map((name, i) => {
+          return {
+            type: 'scatter',
+            mode: 'markers',
+            x: [pc1[i]], // Assumes pc1 is a 1D array with principal component 1 scores for each variable/group
+            y: [pc2[i]], // Assumes pc2 is a 1D array with principal component 2 scores for each variable/group
+
+            name: name,
+            marker: { size: 14, }
+          };
+        });
+
+
+        // Compute the min-max range for the plot
+        const xMin = Math.min(...traces.flatMap(trace => trace.x));
+        const xMax = Math.max(...traces.flatMap(trace => trace.x));
+        const yMin = Math.min(...traces.flatMap(trace => trace.y));
+        const yMax = Math.max(...traces.flatMap(trace => trace.y));
+
+        // Adding optional padding for visual clarity
+        const paddingX = (xMax - xMin) * 0.05; // Adding 5% of range as padding
+        const paddingY = (yMax - yMin) * 0.05;
+
+        const layout = {
+          title: 'PCA Plot',
+          xaxis: {
+            title: 'PC1',
+            range: [xMin - paddingX, xMax + paddingX]
+          },
+          yaxis: {
+            title: 'PC2',
+            range: [yMin - paddingY, yMax + paddingY]
+          }
+        };
+
+        Plotly.newPlot('plotPCA', [traces], layout);
+        document.getElementById('btnPCAExport').style.display = 'block';
+      };
+
+      reader.readAsText(file);
+    }
+
+
+    //////////////////////////////
+    // Venns Diagram plotting
+    ///////////////////////////////
+    function clearData(sectionType) {
+      if (sectionType === 'vennSection') {
+        dataFiles = [
+          { up: [], down: [], term1: "", term2: "" },
+          { up: [], down: [], term1: "", term2: "" },
+          { up: [], down: [], term1: "", term2: "" }
+        ];
+        currentUpload = 1;
+        document.querySelector('label[for="uploadFiles"]').classList.remove('disabled-label');
+        document.getElementById('uploadFiles').disabled = false;
+        const labelForUploadFiles = document.querySelector('label[for="uploadFiles"]');
+        document.querySelector('label[for="uploadFiles"]').textContent = `Load CSV ${currentUpload}`;
+        document.getElementById('loadedFilesList').innerHTML = "";  // clear displayed filenames
+        document.getElementById('btnGenerateVenn').style.display = 'none';
+        document.getElementById('downloadSVG').style.display = 'none';
+        document.getElementById('vennUp').innerHTML = "";
+        document.getElementById('vennDown').innerHTML = "";
+        document.getElementById('vennUpregulatedDataContainer').innerHTML = "";  // Clear upregulated table
+        document.getElementById('vennDownregulatedDataContainer').innerHTML = "";  // Clear downregulated table
+
+
+      } else if (sectionType === 'vennKeggSection') {
+        dataKeggFiles = [
+          { up: [], down: [], term1: "", term2: "" },
+          { up: [], down: [], term1: "", term2: "" },
+          { up: [], down: [], term1: "", term2: "" }
+        ];
+        currentKeggUpload = 1;
+        document.querySelector('label[for="uploadKeggFiles"]').classList.remove('disabled-label');
+        document.getElementById('uploadKeggFiles').disabled = false;
+        document.querySelector('label[for="uploadKeggFiles"]').textContent = `Load CSV ${currentKeggUpload}`;
+        document.getElementById('loadedFilesKeggList').innerHTML = "";  // clear displayed filenames
+        document.getElementById('btnGenerateKeggVenn').style.display = 'none';
+        document.getElementById('downloadKeggSVG').style.display = 'none';
+        document.getElementById('vennKeggUp').innerHTML = "";
+        document.getElementById('vennKeggDown').innerHTML = "";
+        document.getElementById('KeggUpregulatedDataContainer').innerHTML = "";  // Clear upregulated table
+        document.getElementById('KeggDownregulatedDataContainer').innerHTML = "";  // Clear downregulated table
+
+      }
+    }
+
+    document.getElementById('clearData').addEventListener('click', function () {
+      clearData('vennSection');
+    });
+
+    document.getElementById('clearKeggData').addEventListener('click', function () {
+      clearData('vennKeggSection');
+    });
+
+    let currentUpload = 1; // this number is also used to show number of file to be loaded
+    let currentKeggUpload = 1
+    let dataFiles = [
+      { up: [], down: [], term1: "", term2: "" },
+      { up: [], down: [], term1: "", term2: "" },
+      { up: [], down: [], term1: "", term2: "" }
+    ];
+
+    let dataKeggFiles = [
+      { up: [], down: [], term1: "", term2: "" },
+      { up: [], down: [], term1: "", term2: "" },
+      { up: [], down: [], term1: "", term2: "" }
+    ];
+
+    document.getElementById('uploadFiles').addEventListener('change', function () {
+      if (currentUpload <= 3) {
+        readFile(this.files[0], 'vennSection');
+        displayLoadedFile(this.files[0].name, 'vennSection');  // Pass 'vennSection' as sectionType
+        updateButtonText('normal');
+        if (currentUpload === 3) {
+          this.disabled = true; // Disabling the input button
+        }
+      }
+    });
+
+    document.getElementById('uploadKeggFiles').addEventListener('change', function () {
+      if (currentKeggUpload <= 3) {
+        readFile(this.files[0], 'vennKeggSection');
+        displayLoadedFile(this.files[0].name, 'vennKeggSection');  // Pass 'vennKeggSection' as sectionType
+        updateButtonText('kegg');
+        if (currentKeggUpload === 3) {
+          this.disabled = true; // Disabling the input button
+        }
+      }
+    });
+
+    function updateButtonText(type = 'normal') {
+      let current;
+      let uploadLabel;
+      let uploadInput;
+
+      if (type === 'kegg') {
+        current = currentKeggUpload;
+        uploadLabel = document.querySelector('label[for="uploadKeggFiles"]');
+        uploadInput = document.getElementById('uploadKeggFiles');
+      } else {
+        current = currentUpload;
+        uploadLabel = document.querySelector('label[for="uploadFiles"]');
+        uploadInput = document.getElementById('uploadFiles');
+      }
+
+      //console.log('currentUpload: ', currentUpload);
+      //console.log('currentKeggUpload: ', currentKeggUpload);
+
+      if (current < 3) {
+        uploadLabel.textContent = `Load CSV ${current + 1}`;
+      } else {
+        uploadLabel.textContent = "All files loaded!";
+      }
+
+      if (current === 3) {
+        uploadInput.disabled = true; // Disabling the input button
+        uploadLabel.classList.add('disabled-label');
+      }
+    }
+
+    function displayLoadedFile(filename, sectionType) {
+      let fileList;
+      if (sectionType === 'vennKeggSection') {
+        fileList = document.getElementById('loadedFilesKeggList');
+      } else {
+        fileList = document.getElementById('loadedFilesList');
+      }
+
+      const fileItem = document.createElement('div');
+      fileItem.textContent = `Loaded: ${filename}`;
+      fileList.appendChild(fileItem);
+    }
+
+
+    function indicateLoaded(inputId) {
+      const statusId = 'status' + inputId.charAt(inputId.length - 1); // extract the last char from 'uploadX' to get 'statusX'
+      const labelForInput = document.querySelector(`label[for="${inputId}"]`);
+
+      document.getElementById(statusId).style.display = 'inline';
+      labelForInput.classList.add('button-active');
+    }
+
+
+    function readFile(file, sectionType) {
+
+      d3.csv(URL.createObjectURL(file)).then(function (data) {
+
+        var filename = file.name;
+
+        // 1. Determine which array to update
+        let targetData;
+        if (sectionType === 'vennKeggSection') {
+          targetData = dataKeggFiles[currentKeggUpload - 1];
+        } else if (sectionType === 'vennSection') {
+          targetData = dataFiles[currentUpload - 1];
+        }
+        console.log("Target Data:", targetData);
+
+
+        if (sectionType === 'vennKeggSection' && filename.toUpperCase().includes("KEGG")) {
+          validKeggFilenames.push(filename);
+        } else if (sectionType === 'vennSection' && filename.toUpperCase().includes("MS")) {
+          validVennFilenames.push(filename);
+        }
+
+        var parts = filename.split("_vs_");
+        if (parts.length === 2) {
+          var term1 = parts[0].split("_").pop().replace(/X/g, '');
+          var term2 = parts[1].split(".")[0].replace(/X/g, '');
+          targetData.term1 = term1;
+          targetData.term2 = term2;
+        }
+
+        if (filename.toUpperCase().includes("CPKEGG")) {
+          console.log('Processing KEGG file');
+          data.forEach(row => {
+            if (parseFloat(row.padj) < 0.5) {
+              if (parseFloat(row.ES) > 0) {
+                targetData.up.push(row.pathway);
+              } else {
+                targetData.down.push(row.pathway);
+              }
+            }
+          });
+        } else {
+          data.forEach(row => {
+            if (row.Diff_Abund.includes(`${targetData.term2}`)) {
+              targetData.up.push(row.Genes);
+            } else if (row.Diff_Abund.includes(`${targetData.term1}`)) {
+              targetData.down.push(row.Genes);
+            }
+          });
+        }
+
+        if (sectionType === 'vennKeggSection') {
+          currentKeggUpload++;
+          if (currentKeggUpload > 3) currentKeggUpload = 1;
+        } else if (sectionType === 'vennSection') {
+          currentUpload++;
+          if (currentUpload > 3) currentUpload = 1;
+        }
+        //console.log("sectionType :", sectionType);
+        //console.log("Data read from file:", targetData.up, targetData.down);
+        // Passing sectionType parameter
+        checkFilesAndDisplayButton(sectionType);
+      });
+    }
+
+    let validKeggFilenames = [];
+    let validVennFilenames = [];
+
+    function checkFilesAndDisplayButton(sectionType) {
+      let loadedFilesCount, loadedFilesKeggCount, upCount = 0, downCount = 0;
+
+      if (sectionType === 'vennKeggSection') {
+        loadedFilesKeggCount = dataKeggFiles.filter(file => file.up.length || file.down.length).length;
+        upCount = dataKeggFiles.reduce((sum, file) => sum + file.up.length, 0);
+        downCount = dataKeggFiles.reduce((sum, file) => sum + file.down.length, 0);
+      } else if (sectionType === 'vennSection') {
+        loadedFilesCount = dataFiles.filter(file => file.up.length || file.down.length).length;
+        upCount = dataFiles.reduce((sum, file) => sum + file.up.length, 0);
+        downCount = dataFiles.reduce((sum, file) => sum + file.down.length, 0);
+      }
+      //console.log('loadedFilesCount: ', loadedFilesCount)
+      //console.log('sectionType: ', sectionType)
+
+      if (upCount === 0 && downCount === 0) {
+        alert("Warning: Both upregulated and downregulated data are empty for the current section.");
+      } else if (upCount === 0) {
+        alert("Warning: Upregulated data is empty for the current section.");
+      } else if (downCount === 0) {
+        alert("Warning: Downregulated data is empty for the current section.");
+      }
+
+      if (sectionType === 'vennKeggSection' && loadedFilesKeggCount >= 2) {
+        document.getElementById('btnGenerateKeggVenn').style.display = 'block';
+      }
+      else if (sectionType === 'vennSection' && loadedFilesCount >= 2) {
+        document.getElementById('btnGenerateVenn').style.display = 'block';
+      }
+    }
+
+
+    document.getElementById('btnGenerateVenn').addEventListener('click', function () {
+      document.getElementById('vennUp').innerHTML = "";
+      document.getElementById('vennDown').innerHTML = "";
+      plotVennUp(dataFiles[0], dataFiles[1], dataFiles[2]);
+      plotVennDown(dataFiles[0], dataFiles[1], dataFiles[2]);
+    });
+
+    document.getElementById('btnGenerateKeggVenn').addEventListener('click', function () {
+      document.getElementById('vennKeggUp').innerHTML = "";
+      document.getElementById('vennKeggDown').innerHTML = "";
+      plotVennUp(dataKeggFiles[0], dataKeggFiles[1], dataKeggFiles[2]);
+      plotVennDown(dataKeggFiles[0], dataKeggFiles[1], dataKeggFiles[2]);
+    });
+
+
+    function plotVennUp(dataFile1, dataFile2, dataFile3 = {}) {
+
+      let upSet1 = dataFile1.up;
+      let upSet2 = dataFile2.up;
+      let upSet3 = dataFile3.up || []; // Ensures upSet3 is an empty array if dataFile3 is not set
+      console.log(upSet1.length, upSet2.length, upSet3.length)
+      // Check if any dataset is empty
+      if (!upSet1.length || !upSet2.length) {
+        alert("One of the datasets does not contain any upregulated data. Diagram will not be plotted.");
+        return;  // Exit the function early
+      }
+
+      // Calculating overlaps
+      let upOverlap12 = upSet1.filter(gene => upSet2.includes(gene));
+      let upOverlap13 = upSet1.filter(gene => upSet3.includes(gene));
+      let upOverlap23 = upSet2.filter(gene => upSet3.includes(gene));
+      let upOverlap123 = upOverlap12.filter(gene => upSet3.includes(gene));
+      console.log('overlaps: ', upOverlap12.length, upOverlap13.length, upOverlap23.length, upOverlap123.length)
+
+      let sets = [
+        { sets: ['File1'], size: upSet1.length - (upOverlap12.length + upOverlap13.length - upOverlap123.length) },
+        { sets: ['File2'], size: upSet2.length - (upOverlap12.length + upOverlap23.length - upOverlap123.length) },
+        { sets: ['File1', 'File2'], size: upOverlap12.length - upOverlap123.length }
+      ];
+
+      if (upSet3.length) { // If there is a third file
+        sets.push(
+          { sets: ['File3'], size: upSet3.length - (upOverlap13.length + upOverlap23.length - upOverlap123.length) },
+          { sets: ['File1', 'File3'], size: upOverlap13.length - upOverlap123.length },
+          { sets: ['File2', 'File3'], size: upOverlap23.length - upOverlap123.length },
+          { sets: ['File1', 'File2', 'File3'], size: upOverlap123.length }
+        );
+      }
+
+      var chart = venn.VennDiagram();
+
+      // This is not the cleanest solution, find a better way
+      if (upSet1.length > 50) {
+        var div = d3.select("#vennUp").datum(sets).call(chart);
+      } else {
+        var div = d3.select("#vennKeggUp").datum(sets).call(chart);
+      }
+
+      var terms = upSet3.length ? [dataFile1.term1, dataFile2.term2, dataFile3.term1] : [dataFile1.term1, dataFile2.term2];
+
+      styleVenn(div, sets, terms);
+      addLegend(div, "Upregulated");
+      //adjustIntersectionLabels(div);
+      //adjustCircleTexts(div);
+
+      let upTableHtml = generateIntersectionTable(upOverlap12, upOverlap13, upOverlap23, upOverlap123, terms, 'Upregulated data');
+      // Check the current section and place the table accordingly
+      if (document.getElementById('vennSection').style.display !== 'none') {
+        document.getElementById('vennUpregulatedDataContainer').innerHTML = upTableHtml;
+      } else if (document.getElementById('vennKeggSection').style.display !== 'none') {
+        document.getElementById('keggUpregulatedDataContainer').innerHTML = upTableHtml;
+      }
+    }
+
+    function plotVennDown(dataFile1, dataFile2, dataFile3 = {}) {
+      // Similar modifications as in plotVennUp for downregulated genes
+      let downSet1 = dataFile1.down;
+      let downSet2 = dataFile2.down;
+      let downSet3 = dataFile3.down || [];
+
+      // Check if any dataset is empty
+      if (!downSet1.length || !downSet2.length) {
+        alert("One of the datasets does not contain any downregulated data. Diagram will not be plotted.");
+        return;
+      }
+
+
+      let downOverlap12 = downSet1.filter(gene => downSet2.includes(gene));
+      let downOverlap13 = downSet1.filter(gene => downSet3.includes(gene));
+      let downOverlap23 = downSet2.filter(gene => downSet3.includes(gene));
+      let downOverlap123 = downOverlap12.filter(gene => downSet3.includes(gene));
+
+      let sets = [
+        { sets: ['File1'], size: downSet1.length },
+        { sets: ['File2'], size: downSet2.length },
+        { sets: ['File1', 'File2'], size: downOverlap12.length }
+      ];
+
+      if (downSet3.length) { // If there is a third file
+        sets.push(
+          { sets: ['File3'], size: downSet3.length },
+          { sets: ['File1', 'File3'], size: downOverlap13.length },
+          { sets: ['File2', 'File3'], size: downOverlap23.length },
+          { sets: ['File1', 'File2', 'File3'], size: downOverlap123.length }
+        );
+
+      }
+      var chart = venn.VennDiagram();
+      // This is not the cleanest solution, find a better way
+      if (downSet1.length > 50) {
+        var div = d3.select("#vennDown").datum(sets).call(chart);
+        document.getElementById('downloadSVG').style.display = 'block';
+      } else {
+        var div = d3.select("#vennKeggDown").datum(sets).call(chart);
+        document.getElementById('downloadKeggSVG').style.display = 'block';
+      }
+
+      var terms = downSet3.length ? [dataFile1.term1, dataFile2.term2, dataFile3.term1] : [dataFile1.term1, dataFile2.term2];
+
+      styleVenn(div, sets, terms);
+      addLegend(div, "Downregulated");
+      adjustIntersectionLabels(div);
+      adjustCircleTexts(div);
+
+      let upTableHtml = generateIntersectionTable(downOverlap12, downOverlap13, downOverlap23, downOverlap123, terms, 'Downregulated data');
+      // Check the current section and place the table accordingly
+      if (document.getElementById('vennSection').style.display !== 'none') {
+        document.getElementById('vennDownregulatedDataContainer').innerHTML = upTableHtml;
+      } else if (document.getElementById('vennKeggSection').style.display !== 'none') {
+        document.getElementById('keggDownregulatedDataContainer').innerHTML = upTableHtml;
+      }
+
+    }
+
+    function generateIntersectionTable(upOverlap12, upOverlap13, upOverlap23, upOverlap123, terms, title) {
+      let tableHtml = `<table class="intersection-table">
+                        <caption>${title}</caption> <!-- This line adds the table title -->
+                        <thead>
+                            <tr>
+                                <th>Intersection</th>
+                                <th>Count</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+
+      tableHtml += `<tr><td>${terms[0]} vs ${terms[1]}</td><td>${upOverlap12.length}</td></tr>`;
+
+      if (terms.length === 3) {
+        tableHtml += `<tr><td>${terms[0]} vs ${terms[2]}</td><td>${upOverlap13.length}</td></tr>`;
+        tableHtml += `<tr><td>${terms[1]} vs ${terms[2]}</td><td>${upOverlap23.length}</td></tr>`;
+        tableHtml += `<tr><td>${terms[0]} vs ${terms[1]} vs ${terms[2]}</td><td>${upOverlap123.length}</td></tr>`;
+      }
+
+      tableHtml += `</tbody></table>`;
+
+      return tableHtml;
+    }
+
+
+    function styleVenn(div, sets, terms) {
+      var terms = [dataFiles[0].term1 + " vs " + dataFiles[0].term2, dataFiles[1].term1 + " vs " + dataFiles[1].term2];
+      if (dataFiles[2].up.length || dataFiles[2].down.length) {
+        terms.push(dataFiles[2].term1 + " vs " + dataFiles[2].term2);
+      }
+
+      div.selectAll(".venn-circle text")
+        .text(function (d, i) {
+          if (d.sets.length === 1) {
+            let setId = d.sets[0];
+            let idx = Number(setId.charAt(setId.length - 1)) - 1;
+            return terms[idx] + ": " + d.size;
+          }
+          return d.size;
+        })
+        .style("fill", "black")
+        .style("font-size", "16px")
+        .attr("dy", "1.0em");
+
+      // Style the Venn circle edges and make colors pastel
+      div.selectAll(".venn-circle path")
+        .style("stroke-width", "1px")
+        .style("fill", function (d) {
+          let originalColor = d3.select(this).style("fill");
+          return d3.interpolateRgb(originalColor, "#FFFFFF")(0.3); // Made it lighter
+        })
+        .style("stroke", function (d) {
+          let originalColor = d3.select(this).style("fill");
+          return d3.interpolateRgb(originalColor, "#FFFFFF")(0.5);
+        });
+
+      // Adjust intersection labels
+      div.selectAll(".venn-intersection text")
+        .text(function (d) {
+          if (d.sets.length > 1 && d.size > 0) {
+            return d.size;
+          }
+          return "";
+        })
+        .style("fill", "black")
+        .style("font-weight", "bold")
+        .style("font-size", "18px")
+        .attr("dy", "0em");
+    }
+
+    function addLegend(div, legendText) {
+      var legendY = 15; // Adjusted for a slight increase in spacing from the top
+      var legendX = div.node().getBoundingClientRect().width / 2;
+
+      div.append("text")
+        .attr("x", legendX)
+        .attr("y", legendY)
+        .attr("text-anchor", "middle")
+        .style("font-weight", "bold")
+        .style("font-size", "18px")  // Slightly increased font size for better visibility
+        .style("fill", "#333333")  // Added a slightly darker shade of color for the text
+        .text(legendText);
+    }
+
+    document.getElementById("downloadSVG").addEventListener("click", function () {
+      if (document.getElementById("vennUp").querySelector("svg") && document.getElementById("vennDown").querySelector("svg")) {
+        downloadCombinedSVGs("combinedVennDiagrams.svg", "vennUp", "vennDown");
+      } else {
+        alert("Please generate the Venn diagrams first!");
+      }
+    });
+
+    document.getElementById("downloadKeggSVG").addEventListener("click", function () {
+      if (document.getElementById("vennKeggUp").querySelector("svg") && document.getElementById("vennKeggDown").querySelector("svg")) {
+        downloadCombinedSVGs("combinedVennDiagrams.svg", "vennKeggUp", "vennKeggDown");
+      } else {
+        alert("Please generate the Venn diagrams first!");
+      }
+    });
+
+    function adjustIntersectionLabels(div) {
+      const displacement = 15; // Adjust this based on your needs
+      const intervalThreshold = 5;  // If two labels are within this distance in the x-axis, they'll be adjusted
+
+      let intersectionLabels = div.selectAll(".venn-intersection text");
+
+      let sortedLabels = [];
+      intersectionLabels.each(function () {
+        sortedLabels.push(d3.select(this));
+      });
+
+      // Sort labels by x values
+      sortedLabels.sort((a, b) => parseFloat(a.attr("x")) - parseFloat(b.attr("x")));
+
+      if (sortedLabels.length === 2) {
+        let diffX = parseFloat(sortedLabels[1].attr("x")) - parseFloat(sortedLabels[0].attr("x"));
+        if (diffX < intervalThreshold) {
+          // Shift labels apart if they're too close on the x-axis
+          sortedLabels[0].attr("x", parseFloat(sortedLabels[0].attr("x")) - displacement);
+          sortedLabels[1].attr("x", parseFloat(sortedLabels[1].attr("x")) + displacement);
+        }
+      } else if (sortedLabels.length === 3) {
+        // Check the distances between the labels
+        let diffX1 = parseFloat(sortedLabels[1].attr("x")) - parseFloat(sortedLabels[0].attr("x"));
+        let diffX2 = parseFloat(sortedLabels[2].attr("x")) - parseFloat(sortedLabels[1].attr("x"));
+        if (diffX1 < intervalThreshold || diffX2 < intervalThreshold) {
+          sortedLabels[0].attr("x", parseFloat(sortedLabels[0].attr("x")) - displacement);
+          sortedLabels[1].attr("y", parseFloat(sortedLabels[1].attr("y")) + displacement);
+          sortedLabels[2].attr("x", parseFloat(sortedLabels[2].attr("x")) + displacement);
+        }
+      } else if (sortedLabels.length === 4) {
+        // Check the distances between the labels
+        let diffX1 = parseFloat(sortedLabels[1].attr("x")) - parseFloat(sortedLabels[0].attr("x"));
+        console.log('diffX1: ', diffX1)
+
+        if (diffX1 < intervalThreshold) {
+          console.log('changing diffX1', sortedLabels[0].text())
+          sortedLabels[0].attr("x", parseFloat(sortedLabels[0].attr("x")) - displacement).attr("y", parseFloat(sortedLabels[0].attr("y")) - displacement);
+        }
+        let diffX2 = parseFloat(sortedLabels[2].attr("x")) - parseFloat(sortedLabels[1].attr("x"));
+        console.log('diffX2: ', diffX2)
+        if (diffX2 < intervalThreshold) {
+          console.log('changing diffX2', sortedLabels[1].text())
+          sortedLabels[1].attr("x", parseFloat(sortedLabels[1].attr("x")) + displacement).attr("y", parseFloat(sortedLabels[1].attr("y")) - displacement);
+        }
+        let diffX3 = parseFloat(sortedLabels[3].attr("x")) - parseFloat(sortedLabels[2].attr("x"));
+        console.log('diffX3: ', diffX3)
+        if (diffX3 < intervalThreshold) {
+          console.log('changing diffX3', sortedLabels[2].text())
+          sortedLabels[2].attr("x", parseFloat(sortedLabels[2].attr("x")) + displacement / 2).attr("y", parseFloat(sortedLabels[2].attr("y")) - displacement);
+          //sortedLabels[3].attr("x", parseFloat(sortedLabels[3].attr("x")) + displacement).attr("y", parseFloat(sortedLabels[3].attr("y")) - displacement);
+        }
+      }
+    }
+
+    function adjustCircleTexts(div) {
+      const yDisplacement = 15; // Adjust as needed
+
+      let circleTexts = div.selectAll("text")
+        .filter(function (d) {
+          let textContent = d3.select(this).text();
+          return /.*: \d+/.test(textContent);
+        });
+
+      if (circleTexts.size() !== 3) {
+        return;  // Exit if not three circle texts
+      }
+
+      let textsArray = [];
+      circleTexts.each(function (d) {
+        textsArray.push(d3.select(this));
+      });
+
+      // Sort by y attribute
+      textsArray.sort((a, b) => parseFloat(a.attr("y")) - parseFloat(b.attr("y")));
+
+      let firstY = parseFloat(textsArray[0].attr("y"));
+      let secondY = parseFloat(textsArray[1].attr("y"));
+      let thirdY = parseFloat(textsArray[2].attr("y"));
+
+      // Check if middle text's y is too close to the other two
+      if (Math.abs(firstY - secondY) < 5 && Math.abs(secondY - thirdY) < 5) {
+        textsArray[1].attr("y", secondY + yDisplacement);
+      }
+    }
+
+
+    function downloadCombinedSVGs(filename, elementId1, elementId2) {
+      var svg1 = document.getElementById(elementId1).querySelector("svg");
+      var svg2 = document.getElementById(elementId2).querySelector("svg");
+
+      // Create a new SVG to contain both
+      var combinedSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      combinedSvg.setAttribute("width", "600");  // Set according to your layout
+      combinedSvg.setAttribute("height", "800"); // 2x450 since each of your SVGs has a height of 450
+
+      // Append clones of both SVGs to the new combined SVG
+      combinedSvg.appendChild(svg1.cloneNode(true));
+      var svg2Clone = svg2.cloneNode(true);
+      svg2Clone.setAttribute("y", "450"); // Shift the second SVG down
+      combinedSvg.appendChild(svg2Clone);
+
+      // Serialize and download
+      var serializer = new XMLSerializer();
+      var source = serializer.serializeToString(combinedSvg);
+      var blob = new Blob([source], { type: "image/svg+xml;charset=utf-8" });
+      var url = window.URL.createObjectURL(blob);
+
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
+
+  </script>
+</body>
+
+</html>
+apps-fileview.texmex_20240404.01_p0
+VolcanoPlotter_20_duben.html
+Zobrazuje se VolcanoPlotter_20_duben.html.
