@@ -243,6 +243,17 @@
       <br> <br>
       <button id="btnSearchGene" class="button">Mark Genes</button>
       <input type="text" id="geneSearchInput" placeholder="Enter Gene Name">
+      <br> <br>
+      <label for="x-min">X-axis min:</label>
+      <input type="number" id="x-min" value="-5">
+      <label for="x-max">X-axis max:</label>
+      <input type="number" id="x-max" value="7">
+
+      <label for="y-min">Y-axis min:</label>
+      <input type="number" id="y-min" value="-0.2">
+      <label for="y-max">Y-axis max:</label>
+      <input type="number" id="y-max" value="maxYValue">
+      <button id="updatePlot" class="button">Update Plot</button>
     </div>
 
     <div id="parent-container">
@@ -713,6 +724,8 @@
         let highlightedYValues = [];
         let highlightedText = [];
 
+        
+
         document.getElementById('btnSearchGene').addEventListener('click', function () {
           const inputGene = document.getElementById('geneSearchInput').value.trim().toUpperCase();
           if (!inputGene) {
@@ -839,6 +852,24 @@
         console.log(error);
       });
     });
+
+    document.getElementById('updatePlot').addEventListener('click', function() {
+  // Get values from input fields
+  var xMin = parseFloat(document.getElementById('x-min').value);
+  var xMax = parseFloat(document.getElementById('x-max').value);
+  var yMin = parseFloat(document.getElementById('y-min').value);
+  var yMax = parseFloat(document.getElementById('y-max').value);
+
+  // Update the plot layout with the new ranges
+  var update = {
+    'xaxis.range': [xMin, xMax],
+    'yaxis.range': [yMin, yMax]
+  };
+
+  // Apply the update to the plot
+  Plotly.relayout('plot', update);
+});
+
 
 
 
