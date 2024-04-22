@@ -368,6 +368,8 @@
     var vlcnMinX;
     var vlcnMinY;
 
+    var plotUpdated = false;
+
     // showing label / code for click or hard select in mark genes filter
     function VlcnShowLabel(x, y, label, dotName, foundIndex) {
 
@@ -469,6 +471,8 @@
         document.getElementById('plot').innerHTML = '';
         document.getElementById('dot-names').innerHTML = '';
 
+        plotUpdated = false; // on load the plot is in default state
+
         var xValues = data.map(function (row) {
           return +row['logFC']*(-1);
         });
@@ -483,6 +487,7 @@
         });
 
         const maxYValue = Math.max(...yValues) * 1.1;
+        document.getElementById('y-max').value = Math.round(maxYValue); // add to HTML
 
         vlcnMaxX = Math.max(...xValues);
         vlcnMaxY = Math.max(...yValues);
@@ -739,6 +744,7 @@
           highlightedYValues = [];
           highlightedText = [];
 
+          // TODO examine, suspicious -- the reason why sometimes label goes wild lies somewhere here
           // Adjust marker colors and collect highlighted gene data
           plotData[0].marker.color = data.map((row, index) => {
             const geneName = row['Genes'].toUpperCase();
@@ -755,6 +761,20 @@
               return marker.color[index];
             }
           });
+
+          // only if it is not outside new borders in zoomed plot!
+          if(found && plotUpdated) {
+            var tmpX = plotData[0].x[foundIndex];
+            var tmpY = plotData[0].y[foundIndex]
+
+            if(tmpX > parseFloat(document.getElementById('x-max').value) ||
+                tmpX < parseFloat(document.getElementById('x-min').value) ||
+                tmpY > parseFloat(document.getElementById('y-max').value) ||
+                tmpY < parseFloat(document.getElementById('y-min').value)
+            )
+            found = false;
+
+          }
 
           if (!found) {
             alert("No matching gene found.");
@@ -785,6 +805,14 @@
 
             var yratio = 0.727;
             var yadd = 80;
+
+            // only when the plot is modified by settings
+            if(plotUpdated) {
+              vlcnMinX = parseFloat(document.getElementById('x-min').value);
+              vlcnMaxX = parseFloat(document.getElementById('x-max').value);
+              var yMin = parseFloat(document.getElementById('y-min').value);  // todo
+              vlcnMaxY = parseFloat(document.getElementById('y-max').value);
+            }
 
             var xcoord = ((plotData[0].x[foundIndex] - vlcnMinX) / (vlcnMaxX - vlcnMinX)) * vlcnWidth * xratio + xadd; // coords on plot canvas: ratio on plot * width + small offset
             var ycoord = vlcnHeight - ((plotData[0].y[foundIndex] - ycorrection) / (vlcnMaxY - ycorrection)) * vlcnHeight * yratio - yadd; // y is offset by definition
@@ -854,24 +882,27 @@
     });
 
     document.getElementById('updatePlot').addEventListener('click', function() {
-  // Get values from input fields
-  var xMin = parseFloat(document.getElementById('x-min').value);
-  var xMax = parseFloat(document.getElementById('x-max').value);
-  var yMin = parseFloat(document.getElementById('y-min').value);
-  var yMax = parseFloat(document.getElementById('y-max').value);
 
-  // Update the plot layout with the new ranges
-  var update = {
-    'xaxis.range': [xMin, xMax],
-    'yaxis.range': [yMin, yMax]
-  };
+      // Get values from input fields
+      var xMin = parseFloat(document.getElementById('x-min').value);
+      var xMax = parseFloat(document.getElementById('x-max').value);
+      var yMin = parseFloat(document.getElementById('y-min').value);
+      var yMax = parseFloat(document.getElementById('y-max').value);
 
-  // Apply the update to the plot
-  Plotly.relayout('plot', update);
-});
+      // Update the plot layout with the new ranges
+      var update = {
+        'xaxis.range': [xMin, xMax],
+        'yaxis.range': [yMin, yMax]
+      };
 
+      plotUpdated = true;
 
+      // Apply the update to the plot
+      Plotly.relayout('plot', update);
 
+      // TODO: update sums in the corner -- need recalculate all data (just a for cycle over all dots)
+
+    });
 
 
     //////////////////////////////////////////////
